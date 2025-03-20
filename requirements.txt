@@ -1,0 +1,4 @@
+Flask==2.3.3
+flask-socketio==5.3.6
+websockets==11.0.3
+eventlet==0.33.3
