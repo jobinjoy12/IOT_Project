@@ -37,4 +37,4 @@ def handle_sensor_data(data):
 
 if __name__ == '__main__':
     print("🔥 Flask-SocketIO Server running on 0.0.0.0:5000...")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000,allow_unsafe_werkzeug=True)
