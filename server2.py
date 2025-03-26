@@ -1,14 +1,17 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import json
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
 
 # ✅ Serve the dashboard HTML
 @app.route('/')
 def index():
-    return render_template('dashboard.html')  # This should be inside a "templates/" folder
+    return render_template('dashboard.html')  # Ensure this is in a "templates/" folder
 
 # ✅ Handle connections (Browser or ESP32)
 @socketio.on('connect')
@@ -36,5 +39,5 @@ def handle_sensor_data(data):
     print(f"➡️ Emitted to browser: {data}")
 
 if __name__ == '__main__':
-    print("🔥 Flask-SocketIO Server running on 0.0.0.0:5000...")
-    socketio.run(app, host='0.0.0.0', port=5000,allow_unsafe_werkzeug=True)
+    print("🔥 Flask-SocketIO Server running on 0.0.0.0:5000 using eventlet...")
+    socketio.run(app, host='0.0.0.0', port=5000)
