@@ -1,68 +1,40 @@
-import asyncio
-import websockets
-import json
-from flask import Flask
+from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
-import threading
+import json
 
-# Flask-SocketIO Setup
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
-# Serve the dashboard (optional)
+# ✅ Serve the dashboard HTML
 @app.route('/')
 def index():
-    return "✅ Flask-SocketIO Server is running!"
+    return render_template('dashboard.html')  # This should be inside a "templates/" folder
 
-# SocketIO events for browser clients
+# ✅ Handle connections (Browser or ESP32)
 @socketio.on('connect')
-def on_connect():
-    print("✅ Browser connected!")
+def handle_connect():
+    client_ip = request.remote_addr
+    print(f"✅ Client connected: {client_ip}")
 
 @socketio.on('disconnect')
-def on_disconnect():
-    print("❌ Browser disconnected!")
+def handle_disconnect():
+    client_ip = request.remote_addr
+    print(f"❌ Client disconnected: {client_ip}")
 
-# ESP32 WebSocket Server Handler
-async def ws_handler(websocket):
-    print(f"✅ ESP32 Connected from {websocket.remote_address}")
+# ✅ Handle incoming data from ESP32
+@socketio.on('sensor_data')
+def handle_sensor_data(data):
+    client_ip = request.remote_addr
+    print(f"📨 Data from ESP32 [{client_ip}]: {data}")
 
-    try:
-        async for message in websocket:
-            print(f"📨 Received from ESP32 [{websocket.remote_address}]: {message}")
+    # Add device_id from IP if not already provided
+    if 'device_id' not in data:
+        data['device_id'] = client_ip
 
-            try:
-                data = json.loads(message)
-
-                # Add IP as device_id if not present
-                if 'device_id' not in data:
-                    data['device_id'] = websocket.remote_address[0]
-
-                # Emit to browser clients
-                socketio.emit('update_dashboard', data)
-                print(f"➡️ Emitted to browser clients: {data}")
-
-            except json.JSONDecodeError:
-                print("❌ Invalid JSON received from ESP32")
-
-    except websockets.exceptions.ConnectionClosed:
-        print(f"❌ ESP32 {websocket.remote_address} Disconnected!")
-
-# Async WebSocket Server Runner
-async def ws_main():
-    print("🔥 ESP32 WebSocket Server running on port 9000...")
-    async with websockets.serve(ws_handler, "0.0.0.0", 9000):
-        await asyncio.Future()  # Run forever
-
-# Thread target to run the asyncio event loop for the WebSocket server
-def start_websocket_server():
-    asyncio.run(ws_main())
+    # Broadcast to dashboard/browser
+    socketio.emit('update_dashboard', data)
+    print(f"➡️ Emitted to browser: {data}")
 
 if __name__ == '__main__':
-    # Start the WebSocket server in a separate thread
-    ws_thread = threading.Thread(target=start_websocket_server)
-    ws_thread.start()
-
-    # Start the Flask-SocketIO server (main thread)
-    print("🔥 Flask-SocketIO Server running on port 5000...")
-    socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
+    print("🔥 Flask-SocketIO Server running on 0.0.0.0:5000...")
+    socketio.run(app, host='0.0.0.0', port=5000)
