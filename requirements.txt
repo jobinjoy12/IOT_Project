@@ -1,3 +1,4 @@
-flask
+flask==2.2.5
 flask-socketio==4.3.2
 eventlet==0.33.3
+
