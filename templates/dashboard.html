@@ -923,8 +923,12 @@
     });
 
     // Socket.IO connection
-    const socket = io('https://iot-project-hhwg.onrender.com' , {
-        transports: ["websocket"],
+    // To this:
+    const socket = io('https://iot-project-hhwg.onrender.com', {
+        transports: ["websocket", "polling"],  // Add polling as fallback
+        forceNew: true,  // Ensure clean connection
+        reconnection: true,
+        reconnectionAttempts: 10
     });
 
     // Global variables
