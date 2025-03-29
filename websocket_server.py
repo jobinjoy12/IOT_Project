@@ -42,8 +42,7 @@ async def browser_sender(websocket, path):
 
 # Start WebSocket server
 def start_websocket_server():
-    async def handler(websocket):
-        path = websocket.request.path
+    async def handler(websocket,path): 
         if path == "/esp32":
             await esp32_handler(websocket, path)
         elif path == "/browser":
