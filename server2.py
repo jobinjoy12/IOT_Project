@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, emit
 import json
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet', ping_interval=25, ping_timeout=60)
 
 # ✅ Serve the dashboard HTML
 @app.route('/')
