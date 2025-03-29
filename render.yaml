@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: iot-project
+    env: python
+    buildCommand: ""
+    startCommand: python websocket_server.py
+    envVars:
+      - key: PORT
+        value: 10000  # This is ignored for raw WebSocket, but keeps Render happy
