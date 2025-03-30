@@ -1501,9 +1501,9 @@
             }
             
             // Update IV Drip summary
-            if (pressure >= 0.02) {
+            if (pressure >= 0.24) {
                 document.getElementById('ivSummary').textContent = "Blocked";
-            } else if (pressure >= 0.3) {
+            } else if (pressure >= 0.30) {
                 document.getElementById('ivSummary').textContent = "Blocked";
             } else {
                 document.getElementById('ivSummary').textContent = "Normal";
