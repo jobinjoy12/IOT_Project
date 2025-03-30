@@ -1021,34 +1021,6 @@
         addAlert("Disconnected from IoT Health Monitoring System", "danger");
     });
 
-    // Listen for temperature sensor data from ESP32
-    socket.on('sensor_data', (data) => {
-        console.log("📨 Temperature data from ESP32:", data);
-        
-        // Parse data if it's a string
-        let sensorData = data;
-        if (typeof data === 'string') {
-            try {
-                sensorData = JSON.parse(data);
-            } catch (e) {
-                console.error('Error parsing data:', e);
-                return;
-            }
-        }
-        
-        // Check if it's temperature data
-        if (sensorData.sensor === 'temperature' && sensorData.temperature_c !== undefined) {
-            // Create a modified data object that matches your dashboard's expected format
-            const modifiedData = {
-                sensor: 'temperature',
-                temperature_c: sensorData.temperature_c
-            };
-            
-            // Forward to your existing handler
-            socket.emit('update_dashboard', modifiedData);
-        }
-    });
-
     // Initialize Charts
     Chart.defaults.color = 'rgba(255, 255, 255, 0.7)';
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
@@ -1356,6 +1328,92 @@
         
         chartOverview.update();
     }
+
+    socket.on('sensor_data', function(data) {
+    console.log("📨 Raw data from ESP32:", data);
+    
+    // Parse data if it's a string
+    let sensorData = data;
+    if (typeof data === 'string') {
+        try {
+            sensorData = JSON.parse(data);
+        } catch (e) {
+            console.error('Error parsing data:', e);
+            return;
+        }
+    }
+    
+    // Check if it's temperature data from ESP32
+    if (sensorData.sensor === 'temperature' && sensorData.temperature_c !== undefined) {
+        const temp = parseFloat(sensorData.temperature_c);
+        if (isNaN(temp)) {
+            console.error('Invalid temperature value:', sensorData.temperature_c);
+            return;
+        }
+        
+        console.log("Processing temperature:", temp);
+        
+        // Update data points count
+        dataPointsCount++;
+        document.getElementById('dataPoints').textContent = dataPointsCount;
+        
+        // Update last update time
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        
+        const tempCard = document.getElementById('temperatureCard');
+        const tempStatus = document.getElementById('tempStatus');
+        
+        // Store value for statistics
+        temperatureValues.push(temp);
+        if (temperatureValues.length > 50) temperatureValues.shift();
+        
+        // Update display
+        document.getElementById('tempValue').innerHTML = temp.toFixed(2) + "<span class='bpm-unit'>°C</span>";
+        
+        // Update temperature gauge if it exists
+        const tempFill = document.getElementById('tempFill');
+        if (tempFill) {
+            // Map temperature from 34-40°C to 0-100%
+            const tempPercent = ((temp - 34) / (40 - 34)) * 100;
+            tempFill.style.height = `${Math.min(100, Math.max(0, tempPercent))}%`;
+        }
+        
+        // Check status
+        if (tempStatus) {
+            if (temp >= 38.5) {
+                tempStatus.textContent = "🚨 High Fever";
+                tempStatus.className = "status-indicator status-alert";
+                tempCard.classList.add('card-alert');
+                const tempAlertSound = document.getElementById('tempAlertSound');
+                if (tempAlertSound) tempAlertSound.play();
+                addAlert(`High fever detected: ${temp.toFixed(1)}°C`, "danger");
+            } else if (temp >= 37.5) {
+                tempStatus.textContent = "⚠️ Mild Fever";
+                tempStatus.className = "status-indicator status-warning";
+                tempCard.classList.add('card-alert');
+                addAlert(`Mild fever detected: ${temp.toFixed(1)}°C`, "warning");
+            } else if (temp < 35.5) {
+                tempStatus.textContent = "⚠️ Low Temperature";
+                tempStatus.className = "status-indicator status-warning";
+                tempCard.classList.add('card-alert');
+                addAlert(`Low body temperature: ${temp.toFixed(1)}°C`, "warning");
+            } else {
+                tempStatus.textContent = "✅ Normal Temperature";
+                tempStatus.className = "status-indicator status-normal";
+                tempCard.classList.remove('card-alert');
+            }
+        }
+        
+        // Update chart
+        addDataToChart(chartTemp, temp);
+        addDataToOverviewChart(null, temp, null);
+        
+        // Update summary statistics
+        updateSummaryStats();
+        
+        console.log("Temperature data processed successfully");
+    }
+    });
 
     // Process incoming data
     socket.on('update_dashboard', (data) => {
