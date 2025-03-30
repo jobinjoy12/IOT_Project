@@ -25,16 +25,40 @@ def handle_disconnect():
     print(f"❌ Client disconnected: {client_ip}")
 
 # ✅ Handle incoming data from ESP32
-@socketio.on('sensor_data')
-def handle_sensor_data(data):
-    client_ip = request.remote_addr
-    print(f"📨 Data from ESP32 [{client_ip}]: {data}")
+#@socketio.on('sensor_data')
+#def handle_sensor_data(data):
+   # client_ip = request.remote_addr
+   # print(f"📨 Data from ESP32 [{client_ip}]: {data}")
 
     # Add device_id from IP if not already provided
+   # if 'device_id' not in data:
+   #     data['device_id'] = client_ip
+
+    # Broadcast to dashboard/browser
+   # socketio.emit('update_dashboard', data)
+   # print(f"➡️ Emitted to browser: {data}")
+@socketio.on('sensor_data')
+def handle_sensor_data(data):
+    print("⚠️ RAW data received:", data)
+
+    # 🔄 Convert from JSON string if needed
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError as e:
+            print("❌ Invalid JSON from ESP32:", e)
+            return
+
+    if not isinstance(data, dict):
+        print("❌ Parsed data is not a dictionary:", type(data))
+        return
+
+    # ✅ Add IP as device_id if not present
+    client_ip = request.remote_addr
     if 'device_id' not in data:
         data['device_id'] = client_ip
 
-    # Broadcast to dashboard/browser
+    # 📡 Send to browser clients
     socketio.emit('update_dashboard', data)
     print(f"➡️ Emitted to browser: {data}")
 
