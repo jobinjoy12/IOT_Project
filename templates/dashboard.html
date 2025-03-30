@@ -516,6 +516,21 @@
             50% { transform: translateY(-5px); }
         }
 
+        #urineWave {
+            position: relative;
+            height: 60px;
+            overflow: hidden;
+            margin: 20px 0;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        @keyframes waveMotion {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-100%); }
+            100% { transform: translateY(0); }
+        }
+
         /* Summary section */
         .summary-section {
             margin-top: 30px;
@@ -774,6 +789,26 @@
                 <div class="alert-badge">!</div>
             </div>
 
+            <!-- Urine Bag Detection Card -->
+            <div id="urineBagCard" class="dashboard-card animate__animated animate__fadeIn animate__delay-3s">
+                <div class="card-header">
+                    <h2 class="card-title">Urine Bag Status</h2>
+                    <span class="card-icon">🧪</span>
+                </div>
+                <div class="card-subtitle">
+                    <span class="live-indicator"></span> Monitoring Status
+                </div>
+                <div id="urineStatus" class="status-indicator">Waiting for urine bag data...</div>
+                <div class="wave-container" id="urineWave" style="display: none;">
+                    <div class="wave"></div>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <div class="metric-value glow-text" id="urineLevel" style="font-size: 2.5rem;">--</div>
+                </div>
+                <div class="floating-icon">🧪</div>
+                <div class="alert-badge">!</div>
+            </div>
+
             <!-- Historical Data Card (2 columns wide) -->
             <div class="dashboard-card grid-span-2 animate__animated animate__fadeIn animate__delay-4s">
                 <div class="card-header">
@@ -855,6 +890,8 @@
     <audio id="heartRateAlertSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
     <audio id="ivAlertSound" src="https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg"></audio>
     <audio id="tempAlertSound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"></audio>
+    <audio id="urineAlertSound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"></audio>
+
 
     <!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1571,6 +1608,33 @@
             // Update summary statistics
             updateSummaryStats();
         }
+
+        // Inside socket.on('update_dashboard')
+        else if (data.sensor === 'urine_bag') {
+            const urineStatus = document.getElementById('urineStatus');
+            const urineCard = document.getElementById('urineBagCard');
+            const urineLevel = document.getElementById('urineLevel');
+            const urineWave = document.getElementById('urineWave');
+        
+            if (data.status === 'FULL') {
+                urineStatus.textContent = "🚨 Urine Bag Full";
+                urineStatus.className = "status-indicator status-alert";
+                urineCard.classList.add('card-alert');
+                urineLevel.textContent = "FULL";
+                urineWave.style.display = "block";
+                document.getElementById('urineLevel').classList.add('glow-text');
+                document.getElementById('urineAlertSound').play(); // Play the alert sound
+                addAlert("Urine bag is full! Immediate attention needed.", "danger");
+            } else {
+                urineStatus.textContent = "✅ Normal Urine Level";
+                urineStatus.className = "status-indicator status-normal";
+                urineCard.classList.remove('card-alert');
+                urineLevel.textContent = "Empty";
+                urineWave.style.display = "none";
+                urineLevel.classList.remove('glow-text');
+            }
+        }
+
     });
 
     // Theme toggle functionality
