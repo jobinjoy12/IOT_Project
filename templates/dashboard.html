@@ -1291,14 +1291,17 @@
     });
 
     // Helper function to add data to charts
-    function addDataToChart(chart, data) {
-        chart.data.datasets.forEach((dataset) => {
-            dataset.data.push(data);
-            dataset.data.shift();
-        });
-        chart.update();
-    }
+    function addDataToChart(chart, value) {
+    const now = new Date().toLocaleTimeString();
+    chart.data.labels.push(now);
+    chart.data.labels.shift();
 
+    chart.data.datasets.forEach((dataset) => {
+        dataset.data.push(value);
+        dataset.data.shift();
+    });
+    chart.update();
+    }
     // Add data to overview chart
     function addDataToOverviewChart(heartRate, temperature, ivPressure) {
         const timestamp = new Date().toLocaleTimeString();
@@ -1492,7 +1495,7 @@
 
         // Temperature Sensor
         else if (data.sensor === 'temperature') {
-            const temp = data.temperature_c;
+            const temp = parseFloat(data.temperature_c);
             const tempCard = document.getElementById('temperatureCard');
             const tempStatus = document.getElementById('tempStatus');
             
