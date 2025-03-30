@@ -1021,6 +1021,34 @@
         addAlert("Disconnected from IoT Health Monitoring System", "danger");
     });
 
+    // Listen for temperature sensor data from ESP32
+    socket.on('sensor_data', (data) => {
+        console.log("📨 Temperature data from ESP32:", data);
+        
+        // Parse data if it's a string
+        let sensorData = data;
+        if (typeof data === 'string') {
+            try {
+                sensorData = JSON.parse(data);
+            } catch (e) {
+                console.error('Error parsing data:', e);
+                return;
+            }
+        }
+        
+        // Check if it's temperature data
+        if (sensorData.sensor === 'temperature' && sensorData.temperature_c !== undefined) {
+            // Create a modified data object that matches your dashboard's expected format
+            const modifiedData = {
+                sensor: 'temperature',
+                temperature_c: sensorData.temperature_c
+            };
+            
+            // Forward to your existing handler
+            socket.emit('update_dashboard', modifiedData);
+        }
+    });
+
     // Initialize Charts
     Chart.defaults.color = 'rgba(255, 255, 255, 0.7)';
     Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
