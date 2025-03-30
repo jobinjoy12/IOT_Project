@@ -1293,40 +1293,62 @@
     // Helper function to add data to charts
     function addDataToChart(chart, value) {
     const now = new Date().toLocaleTimeString();
+    
+    // Add new data point
     chart.data.labels.push(now);
-    chart.data.labels.shift();
-
-    chart.data.datasets.forEach((dataset) => {
-        dataset.data.push(value);
-        dataset.data.shift();
-    });
-    chart.update();
+    chart.data.datasets[0].data.push(value);
+    
+    // Remove oldest data point to maintain fixed length
+    if (chart.data.labels.length > chart.data.datasets[0].data.length) {
+        chart.data.labels.shift();
+    }
+    
+    // Always shift if we exceed the initial array size
+    if (chart.data.labels.length > 10) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+    }
+    
+    // Update the chart
+    chart.update('none'); // Using 'none' for better performance
     }
     // Add data to overview chart
     function addDataToOverviewChart(heartRate, temperature, ivPressure) {
-        const timestamp = new Date().toLocaleTimeString();
-        
-        // Update labels
-        chartOverview.data.labels.push(timestamp);
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Update labels
+    chartOverview.data.labels.push(timestamp);
+    
+    // Update datasets - Only update the data points that are provided
+    if (heartRate !== null) {
+        chartOverview.data.datasets[0].data.push(heartRate);
+    } else {
+        // Push null to maintain alignment if this metric wasn't updated
+        chartOverview.data.datasets[0].data.push(null);
+    }
+    
+    if (temperature !== null) {
+        chartOverview.data.datasets[1].data.push(temperature);
+    } else {
+        chartOverview.data.datasets[1].data.push(null);
+    }
+    
+    if (ivPressure !== null) {
+        chartOverview.data.datasets[2].data.push(ivPressure);
+    } else {
+        chartOverview.data.datasets[2].data.push(null);
+    }
+    
+    // Remove oldest data points to maintain fixed length
+    if (chartOverview.data.labels.length > 20) {
         chartOverview.data.labels.shift();
-        
-        // Update datasets
-        if (heartRate !== null) {
-            chartOverview.data.datasets[0].data.push(heartRate);
-            chartOverview.data.datasets[0].data.shift();
-        }
-        
-        if (temperature !== null) {
-            chartOverview.data.datasets[1].data.push(temperature);
-            chartOverview.data.datasets[1].data.shift();
-        }
-        
-        if (ivPressure !== null) {
-            chartOverview.data.datasets[2].data.push(ivPressure);
-            chartOverview.data.datasets[2].data.shift();
-        }
-        
-        chartOverview.update();
+        chartOverview.data.datasets[0].data.shift();
+        chartOverview.data.datasets[1].data.shift();
+        chartOverview.data.datasets[2].data.shift();
+    }
+    
+    // Update the chart
+    chartOverview.update('none'); // Using 'none' for better performance
     }
 
     // Process incoming data
