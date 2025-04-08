@@ -11,7 +11,7 @@ socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet', ping_i
 # ✅ Serve the dashboard HTML
 @app.route('/')
 def index():
-    return render_template('dashboard.html')  # Ensure this is in a "templates/" folder
+    return render_template('kok.html')  # Ensure this is in a "templates/" folder
 
 # ✅ Handle connections (Browser or ESP32)
 @socketio.on('connect')
