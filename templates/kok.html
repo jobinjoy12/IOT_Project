@@ -1,0 +1,2341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>🏥 Hospital Ward Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <style>
+        :root {
+            --primary-color: #00ff8c;
+            --secondary-color: #00a1ff;
+            --warning-color: #ff7b00;
+            --danger-color: #ff003c;
+            --background-dark: #050518;
+            --card-bg: rgba(10, 20, 40, 0.8);
+            --text-color: #eef1f7;
+            --ward-bg: rgba(5, 15, 30, 0.9);
+            --patient-card-bg: rgba(20, 40, 80, 0.6);
+            --patient-card-hover: rgba(30, 60, 120, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: var(--background-dark);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Live background */
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+
+        header {
+            font-family: 'Orbitron', sans-serif;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            color: #000;
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 5px 15px rgba(0, 255, 140, 0.3);
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            text-transform: uppercase;
+            background: linear-gradient(to right, #000, #222);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 1px 1px 1px rgba(255,255,255,0.3);
+        }
+
+        .connection-pill {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .connected {
+            background-color: var(--primary-color);
+            color: #000;
+        }
+
+        .disconnected {
+            background-color: var(--danger-color);
+            color: #fff;
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        /* Ward Information Section */
+        .ward-info {
+            background: var(--ward-bg);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ward-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            color: var(--primary-color);
+            margin: 0;
+        }
+
+        .ward-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .ward-stat {
+            text-align: center;
+        }
+
+        .ward-stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            color: var(--secondary-color);
+            margin-bottom: 5px;
+        }
+
+        .ward-stat-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        /* Patients Grid */
+        .patients-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .patient-card {
+            background: var(--patient-card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .patient-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 161, 255, 0.3);
+            background: var(--patient-card-hover);
+        }
+
+        .patient-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            opacity: 0.7;
+        }
+
+        .patient-card.alert::before {
+            background: linear-gradient(90deg, var(--danger-color), var(--warning-color));
+            animation: alertPulse 2s infinite;
+        }
+
+        .patient-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .patient-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-color);
+        }
+
+        .patient-bed {
+            font-size: 1rem;
+            background: rgba(0, 161, 255, 0.2);
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
+        .patient-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .patient-detail {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .patient-status {
+            margin-top: 15px;
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .status-normal {
+            background-color: rgba(0, 255, 140, 0.2);
+            color: var(--primary-color);
+        }
+
+        .status-warning {
+            background-color: rgba(255, 123, 0, 0.2);
+            color: var(--warning-color);
+        }
+
+        .status-alert {
+            background-color: rgba(255, 0, 60, 0.2);
+            color: var(--danger-color);
+            animation: blink 1s infinite;
+        }
+
+        .alert-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background-color: var(--danger-color);
+            box-shadow: 0 0 10px var(--danger-color);
+            animation: pulse 2s infinite;
+            display: none;
+        }
+
+        .patient-card.alert .alert-indicator {
+            display: block;
+        }
+
+        .floating-icon {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            font-size: 2rem;
+            opacity: 0.1;
+            animation: floatingIcon 3s ease-in-out infinite;
+        }
+
+        /* Dashboard modal */
+        .dashboard-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .dashboard-modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .dashboard-container {
+            background: var(--background-dark);
+            border-radius: 15px;
+            width: 95%;
+            height: 95%;
+            max-width: 1400px;
+            overflow: auto;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 161, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .close-dashboard {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 0, 60, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .close-dashboard:hover {
+            background: rgba(255, 0, 60, 0.6);
+            transform: rotate(90deg);
+        }
+
+        /* Animations */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes alertPulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes floatingIcon {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(255, 0, 60, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(255, 0, 60, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(255, 0, 60, 0);
+            }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .patients-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .ward-info {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .ward-stats {
+                width: 100%;
+                justify-content: space-around;
+            }
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        /* Dashboard styles (copied from dashboard.html) */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .dashboard-card {
+            border-radius: 15px;
+            padding: 20px;
+            background: var(--card-bg);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .dashboard-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            opacity: 0.7;
+        }
+
+        .card-alert::before {
+            background: linear-gradient(90deg, var(--danger-color), var(--warning-color));
+            animation: alertPulse 2s infinite;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-color);
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+            opacity: 0.7;
+        }
+
+        .bpm-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .bpm-value {
+            font-size: 3.5rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--secondary-color);
+            text-shadow: 0 0 20px rgba(0, 161, 255, 0.5);
+            position: relative;
+        }
+
+        .bpm-unit {
+            font-size: 1rem;
+            margin-left: 5px;
+            opacity: 0.7;
+        }
+
+        .heart-icon {
+            color: var(--danger-color);
+            margin-right: 10px;
+            animation: heartbeat 1.5s ease infinite;
+            font-size: 2.5rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        .status-normal {
+            background-color: rgba(0, 255, 140, 0.2);
+            color: var(--primary-color);
+        }
+
+        .status-warning {
+            background-color: rgba(255, 123, 0, 0.2);
+            color: var(--warning-color);
+        }
+
+        .status-alert {
+            background-color: rgba(255, 0, 60, 0.2);
+            color: var(--danger-color);
+            animation: blink 1s infinite;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .metric-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--secondary-color);
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 200px;
+            margin-top: 15px;
+        }
+
+        .chart-filled {
+            width: 100%;
+            height: 250px;
+        }
+
+        .grid-span-2 {
+            grid-column: span 2;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            25% { transform: scale(1.1); }
+            50% { transform: scale(1); }
+            75% { transform: scale(1.1); }
+        }
+
+        .pulse-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: rgba(0, 161, 255, 0.1);
+            position: absolute;
+            z-index: -1;
+            transform: scale(1);
+            animation: pulse 2s infinite;
+        }
+
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: blink 1s infinite;
+        }
+
+        .card-subtitle {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .wave-container {
+            position: relative;
+            height: 60px;
+            overflow: hidden;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .wave {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 50%;
+            background-color: rgba(0, 161, 255, 0.2);
+            border-radius: 0 0 8px 8px;
+        }
+
+        .wave::before, .wave::after {
+            content: "";
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -75%);
+            border-radius: 40%;
+        }
+
+        .wave::before {
+            background-color: rgba(0, 161, 255, 0.3);
+            animation: wave 7s linear infinite;
+        }
+
+        .wave::after {
+            background-color: rgba(0, 161, 255, 0.2);
+            animation: wave 15s linear infinite;
+        }
+
+        @keyframes wave {
+            0% { transform: translate(-50%, -75%) rotate(0deg); }
+            100% { transform: translate(-50%, -75%) rotate(360deg); }
+        }
+
+        .temperature-gauge {
+            height: 120px;
+            position: relative;
+            margin: 20px auto;
+            width: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .temperature-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, var(--primary-color), var(--secondary-color), var(--warning-color), var(--danger-color));
+            border-radius: 0 0 20px 20px;
+            transition: height 1s ease;
+        }
+
+        .temperature-bulb {
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(to top, var(--primary-color), var(--secondary-color));
+            border-radius: 50%;
+        }
+
+        .temperature-marks {
+            position: absolute;
+            top: 0;
+            left: 35px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+
+        .temperature-mark {
+            display: flex;
+            align-items: center;
+        }
+
+        .temperature-mark::before {
+            content: '';
+            width: 5px;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.5);
+            margin-right: 5px;
+        }
+
+        .temperature-value {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+
+        .alert-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 25px;
+            height: 25px;
+            background-color: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            animation: bounce 1s infinite;
+            visibility: hidden;
+        }
+
+        .has-alert .alert-badge {
+            visibility: visible;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        #urineWave {
+            position: relative;
+            height: 60px;
+            overflow: hidden;
+            margin: 20px 0;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        @keyframes waveMotion {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-100%); }
+            100% { transform: translateY(0); }
+        }
+
+        .summary-section {
+            margin-top: 30px;
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .summary-heading {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--text-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .summary-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            transition: transform 0.3s ease;
+        }
+
+        .summary-item:hover {
+            transform: translateY(-3px);
+        }
+
+        .summary-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .summary-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--secondary-color);
+        }
+
+        .time-display {
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            align-items: center;
+            color: #000;
+            font-size: 1rem;
+            margin-right: 10px;
+        }
+
+        .time-icon {
+            margin-right: 5px;
+        }
+
+        .alert-history {
+            height: 150px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border-radius: 8px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-color) rgba(255, 255, 255, 0.1);
+        }
+
+        .alert-history::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .alert-history::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .alert-history::-webkit-scrollbar-thumb {
+            background-color: var(--primary-color);
+            border-radius: 10px;
+        }
+
+        .alert-item {
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            border-left: 3px solid var(--primary-color);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .alert-item.warning {
+            border-left-color: var(--warning-color);
+        }
+
+        .alert-item.danger {
+            border-left-color: var(--danger-color);
+        }
+
+        .alert-time {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        /* Patient modal header */
+        .patient-modal-header {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            color: #000;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .patient-modal-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .patient-modal-subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .patient-modal-content {
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Particles background -->
+    <div id="particles-js"></div>
+
+    <header>
+        <div class="header-content">
+            <h1 class="header-title">
+                🏥 Hospital Ward Dashboard
+            </h1>
+            <div class="time-display">
+                <span class="time-icon">⏱️</span>
+                <span id="currentTime">--:--:--</span>
+            </div>
+            <div id="connectionStatus" class="connection-pill disconnected">🔴 Disconnected</div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Ward Information -->
+        <div class="ward-info animate__animated animate__fadeIn">
+            <h2 class="ward-title">Ward 7 - Intensive Care Unit</h2>
+            <div class="ward-stats">
+                <div class="ward-stat">
+                    <div class="ward-stat-value">8</div>
+                    <div class="ward-stat-label">Patients</div>
+                </div>
+                <div class="ward-stat">
+                    <div class="ward-stat-value">2</div>
+                    <div class="ward-stat-label">Alerts</div>
+                </div>
+                <div class="ward-stat">
+                    <div class="ward-stat-value">24/7</div>
+                    <div class="ward-stat-label">Monitoring</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patients Grid -->
+        <div class="patients-grid">
+            <!-- Hardcoded Patient 1 -->
+            <div class="patient-card animate__animated animate__fadeIn">
+                <div class="patient-header">
+                    <h3 class="patient-name">John Smith</h3>
+                    <span class="patient-bed">Bed 1</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">62</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Post-op</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">72 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">36.8°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-normal">Stable</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Hardcoded Patient 2 -->
+            <div class="patient-card animate__animated animate__fadeIn animate__delay-1s">
+                <div class="patient-header">
+                    <h3 class="patient-name">Sarah Johnson</h3>
+                    <span class="patient-bed">Bed 2</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">45</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Pneumonia</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">88 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">37.5°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-warning">Mild Fever</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Hardcoded Patient 3 -->
+            <div class="patient-card animate__animated animate__fadeIn animate__delay-2s">
+                <div class="patient-header">
+                    <h3 class="patient-name">Michael Brown</h3>
+                    <span class="patient-bed">Bed 3</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">58</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Cardiac</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">64 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">36.2°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-normal">Stable</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Hardcoded Patient 4 -->
+            <div class="patient-card animate__animated animate__fadeIn animate__delay-3s">
+                <div class="patient-header">
+                    <h3 class="patient-name">Emily Davis</h3>
+                    <span class="patient-bed">Bed 4</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">72</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Stroke</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">76 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">36.5°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-normal">Stable</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Hardcoded Patient 5 -->
+            <div class="patient-card animate__animated animate__fadeIn animate__delay-1s">
+                <div class="patient-header">
+                    <h3 class="patient-name">Robert Wilson</h3>
+                    <span class="patient-bed">Bed 5</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">65</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Sepsis</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">92 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">38.1°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-warning">Elevated</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Hardcoded Patient 6 -->
+            <div class="patient-card animate__animated animate__fadeIn animate__delay-2s">
+                <div class="patient-header">
+                    <h3 class="patient-name">Lisa Miller</h3>
+                    <span class="patient-bed">Bed 6</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">48</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Trauma</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">84 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">37.2°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-normal">Stable</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Hardcoded Patient 7 -->
+            <div class="patient-card animate__animated animate__fadeIn animate__delay-3s">
+                <div class="patient-header">
+                    <h3 class="patient-name">David Taylor</h3>
+                    <span class="patient-bed">Bed 7</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">53</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Respiratory</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div class="detail-value">78 BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div class="detail-value">36.9°C</div>
+                    </div>
+                </div>
+                <div class="patient-status status-normal">Stable</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+
+            <!-- Dynamic Patient 8 -->
+            <div id="dynamicPatient" class="patient-card animate__animated animate__fadeIn animate__delay-4s">
+                <div class="patient-header">
+                    <h3 class="patient-name">James Anderson</h3>
+                    <span class="patient-bed">Bed 8</span>
+                </div>
+                <div class="patient-details">
+                    <div class="patient-detail">
+                        <div class="detail-label">Age</div>
+                        <div class="detail-value">60</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Condition</div>
+                        <div class="detail-value">Critical</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Heart Rate</div>
+                        <div id="dynamicHeartRate" class="detail-value">-- BPM</div>
+                    </div>
+                    <div class="patient-detail">
+                        <div class="detail-label">Temperature</div>
+                        <div id="dynamicTemperature" class="detail-value">-- °C</div>
+                    </div>
+                </div>
+                <div id="dynamicStatus" class="patient-status status-normal">Monitoring...</div>
+                <div class="alert-indicator"></div>
+                <div class="floating-icon">🛏️</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Dashboard Modal (hidden by default) -->
+    <div class="dashboard-modal" id="dashboardModal">
+        <div class="dashboard-container">
+            <div class="close-dashboard" id="closeDashboard">✕</div>
+            
+            <!-- Patient Modal Header -->
+            <div class="patient-modal-header">
+                <div>
+                    <h2 class="patient-modal-title" id="modalPatientName">James Anderson</h2>
+                    <div class="patient-modal-subtitle">Ward 7 - Bed 8</div>
+                </div>
+                <div class="time-display">
+                    <span class="time-icon">⏱️</span>
+                    <span id="modalCurrentTime">--:--:--</span>
+                </div>
+            </div>
+            
+            <!-- Dashboard Content (copied from dashboard.html) -->
+            <div class="patient-modal-content">
+                <div class="dashboard-grid">
+                    <!-- Heart Rate Monitor Card -->
+                    <div id="heartRateCard" class="dashboard-card animate__animated animate__fadeIn">
+                        <div class="card-header">
+                            <h2 class="card-title">Heart Rate Monitor</h2>
+                            <span class="card-icon">❤️</span>
+                        </div>
+                        <div class="card-subtitle">
+                            <span class="live-indicator"></span> Live Monitoring
+                        </div>
+                        <div class="bpm-display">
+                            <div class="pulse-circle"></div>
+                            <div class="bpm-value" id="bpmValue">--<span class="bpm-unit">BPM</span></div>
+                        </div>
+                        <div id="bpmStatus" class="status-indicator">Waiting for data...</div>
+                        <div class="chart-container">
+                            <canvas id="bpmChart"></canvas>
+                        </div>
+                        <div class="floating-icon">❤️</div>
+                        <div class="alert-badge">!</div>
+                    </div>
+
+                    <!-- Fall Detection Card -->
+                    <div id="fallDetectionCard" class="dashboard-card animate__animated animate__fadeIn animate__delay-1s">
+                        <div class="card-header">
+                            <h2 class="card-title">Fall Detection</h2>
+                            <span class="card-icon">⚠️</span>
+                        </div>
+                        <div class="card-subtitle">
+                            <span class="live-indicator"></span> Real-time Monitoring
+                        </div>
+                        <div id="fallStatus" class="status-indicator">Waiting for fall detection data...</div>
+                        <div class="metric-grid">
+                            <div class="metric-item">
+                                <div class="metric-label">X-Axis</div>
+                                <div class="metric-value" id="accelX">--</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Y-Axis</div>
+                                <div class="metric-value" id="accelY">--</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Z-Axis</div>
+                                <div class="metric-value" id="accelZ">--</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Total G</div>
+                                <div class="metric-value" id="totalG">--</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="accelChart"></canvas>
+                        </div>
+                        <div class="floating-icon">📊</div>
+                        <div class="alert-badge">!</div>
+                    </div>
+
+                    <!-- IV Drip Pressure Card -->
+                    <div id="ivDripCard" class="dashboard-card animate__animated animate__fadeIn animate__delay-2s">
+                        <div class="card-header">
+                            <h2 class="card-title">IV Drip Pressure</h2>
+                            <span class="card-icon">💧</span>
+                        </div>
+                        <div class="card-subtitle">
+                            <span class="live-indicator"></span> Flow Monitoring
+                        </div>
+                        <div id="ivDripStatus" class="status-indicator">Waiting for IV Drip data...</div>
+                        <div class="wave-container">
+                            <div class="wave"></div>
+                        </div>
+                        <div class="metric-grid">
+                            <div class="metric-item">
+                                <div class="metric-label">Current Pressure</div>
+                                <div class="metric-value glow-text" id="ivDripPressure">-- <span class="bpm-unit">kPa</span></div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Flow Status</div>
+                                <div class="metric-value" id="flowStatus">--</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="ivDripChart"></canvas>
+                        </div>
+                        <div class="floating-icon">💧</div>
+                        <div class="alert-badge">!</div>
+                    </div>
+
+                    <!-- Temperature Sensor Card -->
+                    <div id="temperatureCard" class="dashboard-card animate__animated animate__fadeIn animate__delay-3s">
+                        <div class="card-header">
+                            <h2 class="card-title">Body Temperature</h2>
+                            <span class="card-icon">🌡️</span>
+                        </div>
+                        <div class="card-subtitle">
+                            <span class="live-indicator"></span> Continuous Monitoring
+                        </div>
+                        <div id="tempStatus" class="status-indicator">Waiting for temperature data...</div>
+                        <div style="display: flex; align-items: center; justify-content: center; margin: 15px 0;">
+                            <div class="temperature-gauge">
+                                <div class="temperature-fill" id="tempFill" style="height: 0%"></div>
+                                <div class="temperature-bulb"></div>
+                                <div class="temperature-marks">
+                                    <div class="temperature-mark"><span class="temperature-value">40°</span></div>
+                                    <div class="temperature-mark"><span class="temperature-value">38°</span></div>
+                                    <div class="temperature-mark"><span class="temperature-value">36°</span></div>
+                                    <div class="temperature-mark"><span class="temperature-value">34°</span></div>
+                                </div>
+                            </div>
+                            <div style="margin-left: 30px;">
+                                <div class="metric-value glow-text" id="tempValue" style="font-size: 3rem;">--<span class="bpm-unit">°C</span></div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="tempChart"></canvas>
+                        </div>
+                        <div class="floating-icon">🌡️</div>
+                        <div class="alert-badge">!</div>
+                    </div>
+
+                    <!-- Urine Bag Detection Card -->
+                    <div id="urineBagCard" class="dashboard-card animate__animated animate__fadeIn animate__delay-3s">
+                        <div class="card-header">
+                            <h2 class="card-title">Urine Bag Status</h2>
+                            <span class="card-icon">🧪</span>
+                        </div>
+                        <div class="card-subtitle">
+                            <span class="live-indicator"></span> Monitoring Status
+                        </div>
+                        <div id="urineStatus" class="status-indicator">Waiting for urine bag data...</div>
+                        <div class="wave-container" id="urineWave" style="display: none;">
+                            <div class="wave"></div>
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <div class="metric-value glow-text" id="urineLevel" style="font-size: 2.5rem;">--</div>
+                        </div>
+                        <div class="floating-icon">🧪</div>
+                        <div class="alert-badge">!</div>
+                    </div>
+
+                    <!-- Historical Data Card (2 columns wide) -->
+                    <div class="dashboard-card grid-span-2 animate__animated animate__fadeIn animate__delay-4s">
+                        <div class="card-header">
+                            <h2 class="card-title">Health Data Overview</h2>
+                            <span class="card-icon">📊</span>
+                        </div>
+                        <div class="chart-filled">
+                            <canvas id="overviewChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Alert History Card -->
+                    <div class="dashboard-card animate__animated animate__fadeIn animate__delay-5s">
+                        <div class="card-header">
+                            <h2 class="card-title">Alert History</h2>
+                            <span class="card-icon">🚨</span>
+                        </div>
+                        <div class="alert-history" id="alertHistory">
+                            <!-- Alert items will be added here dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats Card -->
+                    <div class="dashboard-card animate__animated animate__fadeIn animate__delay-6s">
+                        <div class="card-header">
+                            <h2 class="card-title">System Status</h2>
+                            <span class="card-icon">📋</span>
+                        </div>
+                        <div class="metric-grid">
+                            <div class="metric-item">
+                                <div class="metric-label">Uptime</div>
+                                <div class="metric-value" id="uptime">--:--:--</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Data Points</div>
+                                <div class="metric-value" id="dataPoints">0</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Alerts Today</div>
+                                <div class="metric-value" id="alertCount">0</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Last Update</div>
+                                <div class="metric-value" id="lastUpdate">--:--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary section -->
+                <div class="summary-section animate__animated animate__fadeIn animate__delay-7s">
+                    <h2 class="summary-heading">Patient Health Summary</h2>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Avg Heart Rate</div>
+                            <div class="summary-value" id="avgHeartRate">--</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Avg Temperature</div>
+                            <div class="summary-value" id="avgTemperature">--</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">IV Status</div>
+                            <div class="summary-value" id="ivSummary">--</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Falls Detected</div>
+                            <div class="summary-value" id="fallsDetected">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Theme toggle button -->
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+
+    <!-- Audio alerts -->
+    <audio id="fallAlertSound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+    <audio id="heartRateAlertSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+    <audio id="ivAlertSound" src="https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg"></audio>
+    <audio id="tempAlertSound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"></audio>
+    <audio id="urineAlertSound" src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg"></audio>
+    <audio id="patientAlertSound" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+
+    <script>
+        // Initialize particles.js for the background
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {
+                    "value": 80,
+                    "density": { "enable": true, "value_area": 800 }
+                },
+                "color": { "value": "#00a1ff" },
+                "shape": {
+                    "type": "circle",
+                    "stroke": { "width": 0, "color": "#000000" },
+                    "polygon": { "nb_sides": 5 }
+                },
+                "opacity": {
+                    "value": 0.3,
+                    "random": true,
+                    "anim": { "enable": false, "speed": 1, "opacity_min": 0.1, "sync": false }
+                },
+                "size": {
+                    "value": 3,
+                    "random": true,
+                    "anim": { "enable": false, "speed": 40, "size_min": 0.1, "sync": false }
+                },
+                "line_linked": {
+                    "enable": true,
+                    "distance": 150,
+                    "color": "#00a1ff",
+                    "opacity": 0.2,
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 2,
+                    "direction": "none",
+                    "random": false,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": false,
+                    "attract": { "enable": false, "rotateX": 600, "rotateY": 1200 }
+                }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": {
+                    "onhover": { "enable": true, "mode": "grab" },
+                    "onclick": { "enable": true, "mode": "push" },
+                    "resize": true
+                },
+                "modes": {
+                    "grab": { "distance": 140, "line_linked": { "opacity": 0.5 } },
+                    "bubble": { "distance": 400, "size": 40, "duration": 2, "opacity": 8, "speed": 3 },
+                    "repulse": { "distance": 200, "duration": 0.4 },
+                    "push": { "particles_nb": 4 },
+                    "remove": { "particles_nb": 2 }
+                }
+            },
+            "retina_detect": true
+        });
+
+        // Socket.IO connection
+        const socket = io('https://iot-project-hhwg.onrender.com', {
+            transports: ["websocket", "polling"],
+            forceNew: true,
+            reconnection: true,
+            reconnectionAttempts: 10
+        });
+
+        // Global variables
+        let startTime = new Date();
+        let dataPointsCount = 0;
+        let alertsCount = 0;
+        let fallsDetected = 0;
+        let heartRateValues = [];
+        let temperatureValues = [];
+        let ivPressureValues = [];
+        let accelGValues = [];
+        let isAlertActive = false;
+
+        // Update current time
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+            document.getElementById('modalCurrentTime').textContent = now.toLocaleTimeString();
+            
+            // Calculate uptime
+            const diff = now - startTime;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            document.getElementById('uptime').textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Add alert to history
+        function addAlert(message, type = 'normal') {
+            const alertHistory = document.getElementById('alertHistory');
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            
+            const alertItem = document.createElement('div');
+            alertItem.className = `alert-item ${type} animate__animated animate__fadeInDown`;
+            alertItem.innerHTML = `
+                <span>${message}</span>
+                <span class="alert-time">${timeString}</span>
+            `;
+            
+            alertHistory.prepend(alertItem);
+            
+            // Keep only the last 20 alerts
+            const alerts = alertHistory.querySelectorAll('.alert-item');
+            if (alerts.length > 20) {
+                alertHistory.removeChild(alerts[alerts.length - 1]);
+            }
+            
+            // Update alert count
+            alertsCount++;
+            document.getElementById('alertCount').textContent = alertsCount;
+        }
+
+        // Calculate and update summary statistics
+        function updateSummaryStats() {
+            // Average heart rate
+            if (heartRateValues.length > 0) {
+                const avgHR = heartRateValues.reduce((sum, val) => sum + val, 0) / heartRateValues.length;
+                document.getElementById('avgHeartRate').textContent = avgHR.toFixed(1) + ' BPM';
+            }
+            
+            // Average temperature
+            if (temperatureValues.length > 0) {
+                const avgTemp = temperatureValues.reduce((sum, val) => sum + val, 0) / temperatureValues.length;
+                document.getElementById('avgTemperature').textContent = avgTemp.toFixed(2) + ' °C';
+            }
+            
+            // Falls detected
+            document.getElementById('fallsDetected').textContent = fallsDetected;
+        }
+
+        // Connection status updates
+        socket.on('connect', () => {
+            console.log("✅ Connected to Flask-SocketIO Server!");
+            const connectionStatus = document.getElementById('connectionStatus');
+            connectionStatus.textContent = "🟢 Connected";
+            connectionStatus.classList.remove('disconnected');
+            connectionStatus.classList.add('connected');
+            
+            addAlert("Connected to IoT Health Monitoring System", "normal");
+        });
+
+        socket.on('disconnect', () => {
+            console.log("❌ Disconnected from Flask-SocketIO Server!");
+            const connectionStatus = document.getElementById('connectionStatus');
+            connectionStatus.textContent = "🔴 Disconnected";
+            connectionStatus.classList.remove('connected');
+            connectionStatus.classList.add('disconnected');
+            
+            addAlert("Disconnected from IoT Health Monitoring System", "danger");
+        });
+
+        // Initialize Charts
+        Chart.defaults.color = 'rgba(255, 255, 255, 0.7)';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+        
+        // Heart Rate Chart
+        const ctxBPM = document.getElementById('bpmChart').getContext('2d');
+        const chartBPM = new Chart(ctxBPM, {
+            type: 'line',
+            data: {
+                labels: Array(10).fill(''),
+                datasets: [{
+                    label: 'BPM',
+                    data: Array(10).fill(null),
+                    borderColor: '#00a1ff',
+                    borderWidth: 2,
+                    fill: true,
+                    backgroundColor: 'rgba(0, 161, 255, 0.1)',
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#00a1ff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        beginAtZero: false,
+                        min: 40,
+                        max: 140,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                },
+                animation: {
+                    duration: 500
+                }
+            }
+        });
+
+        // IV Drip Chart
+        const ctxIVDrip = document.getElementById('ivDripChart').getContext('2d');
+        const chartIVDrip = new Chart(ctxIVDrip, {
+            type: 'line',
+            data: {
+                labels: Array(10).fill(''),
+                datasets: [{
+                    label: 'Pressure (kPa)',
+                    data: Array(10).fill(null),
+                    borderColor: '#00ff8c',
+                    borderWidth: 2,
+                    fill: true,
+                    backgroundColor: 'rgba(0, 255, 140, 0.1)',
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#00ff8c'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        beginAtZero: true,
+                        suggestedMax: 1,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                },
+                animation: {
+                    duration: 500
+                }
+            }
+        });
+
+        // Temperature Chart
+        const ctxTemp = document.getElementById('tempChart').getContext('2d');
+        const chartTemp = new Chart(ctxTemp, {
+            type: 'line',
+            data: {
+                labels: Array(10).fill(''),
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    data: Array(10).fill(null),
+                    borderColor: '#ff7b00',
+                    borderWidth: 2,
+                    fill: true,
+                    backgroundColor: 'rgba(255, 123, 0, 0.1)',
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#ff7b00'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        beginAtZero: false,
+                        min: 29,
+                        max: 40,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                },
+                animation: {
+                    duration: 500
+                }
+            }
+        });
+
+        // Acceleration Chart
+        const ctxAccel = document.getElementById('accelChart').getContext('2d');
+        const chartAccel = new Chart(ctxAccel, {
+            type: 'line',
+            data: {
+                labels: Array(10).fill(''),
+                datasets: [{
+                    label: 'Total G',
+                    data: Array(10).fill(null),
+                    borderColor: '#ff003c',
+                    borderWidth: 2,
+                    fill: true,
+                    backgroundColor: 'rgba(255, 0, 60, 0.1)',
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#ff003c'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        beginAtZero: true,
+                        suggestedMax: 5,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                },
+                animation: {
+                    duration: 500
+                }
+            }
+        });
+
+        // Overview Chart (combined data)
+        const ctxOverview = document.getElementById('overviewChart').getContext('2d');
+        const chartOverview = new Chart(ctxOverview, {
+            type: 'line',
+            data: {
+                labels: Array(20).fill(''),
+                datasets: [
+                    {
+                        label: 'Heart Rate (BPM)',
+                        data: Array(20).fill(null),
+                        borderColor: '#00a1ff',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#00a1ff',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Temperature (°C)',
+                        data: Array(20).fill(null),
+                        borderColor: '#ff7b00',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#ff7b00',
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'IV Pressure (kPa)',
+                        data: Array(20).fill(null),
+                        borderColor: '#00ff8c',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#00ff8c',
+                        yAxisID: 'y2'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                stacked: false,
+                scales: {
+                    x: { 
+                        display: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y: { 
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Heart Rate (BPM)'
+                        },
+                        min: 40,
+                        max: 140,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        },
+                        min: 29,
+                        max: 40,
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'IV Pressure (kPa)'
+                        },
+                        min: 0,
+                        max: 1,
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Helper function to add data to charts
+        function addDataToChart(chart, value) {
+            const now = new Date().toLocaleTimeString();
+
+            chart.data.labels.push(now);
+            chart.data.datasets[0].data.push(value);
+
+            // Always maintain length of 10
+            if (chart.data.labels.length > 10) chart.data.labels.shift();
+            if (chart.data.datasets[0].data.length > 10) chart.data.datasets[0].data.shift();
+
+            chart.update('none');
+        }
+
+        // Add data to overview chart
+        function addDataToOverviewChart(heartRate, temperature, ivPressure) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Update labels
+            chartOverview.data.labels.push(timestamp);
+            
+            // Update datasets - Only update the data points that are provided
+            if (heartRate !== null) {
+                chartOverview.data.datasets[0].data.push(heartRate);
+            } else {
+                // Push null to maintain alignment if this metric wasn't updated
+                chartOverview.data.datasets[0].data.push(null);
+            }
+            
+            if (temperature !== null) {
+                chartOverview.data.datasets[1].data.push(temperature);
+            } else {
+                chartOverview.data.datasets[1].data.push(null);
+            }
+            
+            if (ivPressure !== null) {
+                chartOverview.data.datasets[2].data.push(ivPressure);
+            } else {
+                chartOverview.data.datasets[2].data.push(null);
+            }
+            
+            // Remove oldest data points to maintain fixed length
+            if (chartOverview.data.labels.length > 20) {
+                chartOverview.data.labels.shift();
+                chartOverview.data.datasets[0].data.shift();
+                chartOverview.data.datasets[1].data.shift();
+                chartOverview.data.datasets[2].data.shift();
+            }
+            
+            // Update the chart
+            chartOverview.update('none'); // Using 'none' for better performance
+        }
+
+        // Process incoming data
+        socket.on('update_dashboard', (data) => {
+            console.log("📨 Data from server:", data);
+
+            // ✅ Parse if needed
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                } catch (e) {
+                    console.error('❌ Error parsing data:', e);
+                    return;
+                }
+            }
+            
+            // Update total data points count
+            dataPointsCount++;
+            document.getElementById('dataPoints').textContent = dataPointsCount;
+            
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+            // Heart Rate Sensor
+            if (data.sensor === 'heart_rate') {
+                const bpm = data.bpm;
+                const bpmValue = document.getElementById('bpmValue');
+                const heartRateCard = document.getElementById('heartRateCard');
+                const bpmStatus = document.getElementById('bpmStatus');
+                
+                // Update dynamic patient card
+                document.getElementById('dynamicHeartRate').textContent = bpm + ' BPM';
+                
+                // Store value for statistics
+                heartRateValues.push(bpm);
+                if (heartRateValues.length > 50) heartRateValues.shift();
+                
+                // Update display
+                bpmValue.innerHTML = bpm + "<span class='bpm-unit'>BPM</span>";
+                bpmValue.classList.add('glow-text');
+                setTimeout(() => bpmValue.classList.remove('glow-text'), 1000);
+
+                // Check status
+                if (bpm < 60) {
+                    bpmStatus.textContent = "⚠️ Low Heart Rate";
+                    bpmStatus.className = "status-indicator status-warning";
+                    heartRateCard.classList.add('card-alert');
+                    document.getElementById('heartRateAlertSound').play();
+                    addAlert(`Low heart rate detected: ${bpm} BPM`, "warning");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "⚠️ Low Heart Rate";
+                    document.getElementById('dynamicStatus').className = "patient-status status-warning";
+                    triggerPatientAlert();
+                } else if (bpm > 100) {
+                    bpmStatus.textContent = "🚨 High Heart Rate";
+                    bpmStatus.className = "status-indicator status-alert";
+                    heartRateCard.classList.add('card-alert');
+                    document.getElementById('heartRateAlertSound').play();
+                    addAlert(`High heart rate detected: ${bpm} BPM`, "danger");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "🚨 High Heart Rate";
+                    document.getElementById('dynamicStatus').className = "patient-status status-alert";
+                    triggerPatientAlert();
+                } else {
+                    bpmStatus.textContent = "✅ Normal Heart Rate";
+                    bpmStatus.className = "status-indicator status-normal";
+                    heartRateCard.classList.remove('card-alert');
+                    
+                    // Clear alert if no other alerts are active
+                    if (!isAlertActive) {
+                        document.getElementById('dynamicPatient').classList.remove('alert');
+                        document.getElementById('dynamicStatus').textContent = "✅ Stable";
+                        document.getElementById('dynamicStatus').className = "patient-status status-normal";
+                    }
+                }
+
+                // Update chart
+                addDataToChart(chartBPM, bpm);
+                addDataToOverviewChart(bpm, null, null);
+                
+                // Update summary statistics
+                updateSummaryStats();
+            }
+
+            // Fall Detection Sensor
+            else if (data.sensor === 'fall_detector') {
+                const fallStatus = document.getElementById('fallStatus');
+                const fallDetectionCard = document.getElementById('fallDetectionCard');
+
+                // Update display
+                if (data.status === 'YES' || data.status === 'fall_detected') {
+                    fallStatus.textContent = "🚨 Fall Detected!";
+                    fallStatus.className = "status-indicator status-alert";
+                    fallDetectionCard.classList.add('card-alert', 'shake');
+                    document.getElementById('fallAlertSound').play();
+                    
+                    // Increment fall counter
+                    fallsDetected++;
+                    document.getElementById('fallsDetected').textContent = fallsDetected;
+                    
+                    // Add alert
+                    addAlert("Fall detected! Immediate assistance may be required.", "danger");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "🚨 Fall Detected";
+                    document.getElementById('dynamicStatus').className = "patient-status status-alert";
+                    triggerPatientAlert();
+                    
+                    // Remove shake animation after 2 seconds
+                    setTimeout(() => fallDetectionCard.classList.remove('shake'), 2000);
+                } else {
+                    fallStatus.textContent = "✅ No Fall Detected";
+                    fallStatus.className = "status-indicator status-normal";
+                    fallDetectionCard.classList.remove('card-alert');
+                    
+                    // Clear alert if no other alerts are active
+                    if (!isAlertActive) {
+                        document.getElementById('dynamicPatient').classList.remove('alert');
+                        document.getElementById('dynamicStatus').textContent = "✅ Stable";
+                        document.getElementById('dynamicStatus').className = "patient-status status-normal";
+                    }
+                }
+
+                // Update accelerometer display
+                if (data.accel) {
+                    document.getElementById('accelX').textContent = data.accel.x.toFixed(2);
+                    document.getElementById('accelY').textContent = data.accel.y.toFixed(2);
+                    document.getElementById('accelZ').textContent = data.accel.z.toFixed(2);
+                    
+                    // Add animation for changing values
+                    const accelValues = document.querySelectorAll('.metric-value');
+                    accelValues.forEach(val => {
+                        val.classList.add('glow-text');
+                        setTimeout(() => val.classList.remove('glow-text'), 1000);
+                    });
+                }
+
+                // Update Total G
+                if (data.total_g !== undefined) {
+                    const totalG = data.total_g;
+                    document.getElementById('totalG').textContent = totalG.toFixed(2);
+                    
+                    // Store for statistics
+                    accelGValues.push(totalG);
+                    if (accelGValues.length > 50) accelGValues.shift();
+                    
+                    // Update accel chart
+                    addDataToChart(chartAccel, totalG);
+                }
+                
+                // Update summary statistics
+                updateSummaryStats();
+            }
+
+            // IV Drip Sensor
+            else if (data.sensor === 'pressure') {
+                const pressure = data.pressure;
+                const ivDripCard = document.getElementById('ivDripCard');
+                const ivDripStatus = document.getElementById('ivDripStatus');
+                const flowStatus = document.getElementById('flowStatus');
+                
+                // Store value for statistics
+                ivPressureValues.push(pressure);
+                if (ivPressureValues.length > 50) ivPressureValues.shift();
+                
+                // Update display
+                document.getElementById('ivDripPressure').innerHTML = pressure.toFixed(3) + "<span class='bpm-unit'>kPa</span>";
+                
+                // Check status
+                if (pressure >= 0.24) {
+                    ivDripStatus.textContent = "🚨 Critical: IV Line Blocked";
+                    ivDripStatus.className = "status-indicator status-alert";
+                    ivDripCard.classList.add('card-alert');
+                    flowStatus.textContent = "Blocked";
+                    document.getElementById('ivAlertSound').play();
+                    addAlert("Critical IV line blockage detected!", "danger");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "🚨 IV Blocked";
+                    document.getElementById('dynamicStatus').className = "patient-status status-alert";
+                    triggerPatientAlert();
+                } else if (pressure >= 0.30) {
+                    ivDripStatus.textContent = "⚠️ Warning: Partial Blockage";
+                    ivDripStatus.className = "status-indicator status-warning";
+                    ivDripCard.classList.add('card-alert');
+                    flowStatus.textContent = "Restricted";
+                    addAlert("IV drip partial blockage detected.", "warning");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "⚠️ IV Restricted";
+                    document.getElementById('dynamicStatus').className = "patient-status status-warning";
+                    triggerPatientAlert();
+                } else {
+                    ivDripStatus.textContent = "✅ Normal IV Flow";
+                    ivDripStatus.className = "status-indicator status-normal";
+                    ivDripCard.classList.remove('card-alert');
+                    flowStatus.textContent = "Normal";
+                    
+                    // Clear alert if no other alerts are active
+                    if (!isAlertActive) {
+                        document.getElementById('dynamicPatient').classList.remove('alert');
+                        document.getElementById('dynamicStatus').textContent = "✅ Stable";
+                        document.getElementById('dynamicStatus').className = "patient-status status-normal";
+                    }
+                }
+                
+                // Update IV Drip summary
+                if (pressure >= 0.24) {
+                    document.getElementById('ivSummary').textContent = "Blocked";
+                } else if (pressure >= 0.30) {
+                    document.getElementById('ivSummary').textContent = "Blocked";
+                } else {
+                    document.getElementById('ivSummary').textContent = "Normal";
+                }
+                
+                // Update chart
+                addDataToChart(chartIVDrip, pressure);
+                addDataToOverviewChart(null, null, pressure);
+                
+                // Update summary statistics
+                updateSummaryStats();
+            }
+
+            // Temperature Sensor
+            else if (data.sensor === 'temperature') {
+                const temp = parseFloat(data.temperature_c);
+                const tempCard = document.getElementById('temperatureCard');
+                const tempStatus = document.getElementById('tempStatus');
+                
+                // Update dynamic patient card
+                document.getElementById('dynamicTemperature').textContent = temp.toFixed(1) + ' °C';
+                
+                // Store value for statistics
+                temperatureValues.push(temp);
+                if (temperatureValues.length > 50) temperatureValues.shift();
+                
+                // Update display
+                document.getElementById('tempValue').innerHTML = temp.toFixed(2) + "<span class='bpm-unit'>°C</span>";
+                
+                // Update temperature gauge
+                // Map temperature from 34-40°C to 0-100%
+                const tempPercent = ((temp - 34) / (40 - 34)) * 100;
+                document.getElementById('tempFill').style.height = `${Math.min(100, Math.max(0, tempPercent))}%`;
+                
+                // Check status
+                if (temp >= 38.5) {
+                    tempStatus.textContent = "🚨 High Fever";
+                    tempStatus.className = "status-indicator status-alert";
+                    tempCard.classList.add('card-alert');
+                    document.getElementById('tempAlertSound').play();
+                    addAlert(`High fever detected: ${temp.toFixed(1)}°C`, "danger");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "🚨 High Fever";
+                    document.getElementById('dynamicStatus').className = "patient-status status-alert";
+                    triggerPatientAlert();
+                } else if (temp >= 37.5) {
+                    tempStatus.textContent = "⚠️ Mild Fever";
+                    tempStatus.className = "status-indicator status-warning";
+                    tempCard.classList.add('card-alert');
+                    addAlert(`Mild fever detected: ${temp.toFixed(1)}°C`, "warning");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "⚠️ Mild Fever";
+                    document.getElementById('dynamicStatus').className = "patient-status status-warning";
+                    triggerPatientAlert();
+                } else if (temp < 35.5) {
+                    tempStatus.textContent = "⚠️ Low Temperature";
+                    tempStatus.className = "status-indicator status-warning";
+                    tempCard.classList.add('card-alert');
+                    addAlert(`Low body temperature: ${temp.toFixed(1)}°C`, "warning");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "⚠️ Low Temp";
+                    document.getElementById('dynamicStatus').className = "patient-status status-warning";
+                    triggerPatientAlert();
+                } else {
+                    tempStatus.textContent = "✅ Normal Temperature";
+                    tempStatus.className = "status-indicator status-normal";
+                    tempCard.classList.remove('card-alert');
+                    
+                    // Clear alert if no other alerts are active
+                    if (!isAlertActive) {
+                        document.getElementById('dynamicPatient').classList.remove('alert');
+                        document.getElementById('dynamicStatus').textContent = "✅ Stable";
+                        document.getElementById('dynamicStatus').className = "patient-status status-normal";
+                    }
+                }
+                
+                // Update chart
+                if (!isNaN(temp)) {
+                    console.log("✅ Pushing valid temperature:", temp);
+                    addDataToChart(chartTemp, temp);
+                    addDataToOverviewChart(null, temp, null);
+                } else {
+                    console.warn("❌ Skipping invalid temperature:", temp);
+                }
+
+                
+                // Update summary statistics
+                updateSummaryStats();
+            }
+
+            // Urine Bag Sensor
+            else if (data.sensor === 'urine_bag') {
+                const urineStatus = document.getElementById('urineStatus');
+                const urineCard = document.getElementById('urineBagCard');
+                const urineLevel = document.getElementById('urineLevel');
+                const urineWave = document.getElementById('urineWave');
+            
+                if (data.status === 'FULL') {
+                    urineStatus.textContent = "🚨 Urine Bag Full";
+                    urineStatus.className = "status-indicator status-alert";
+                    urineCard.classList.add('card-alert');
+                    urineLevel.textContent = "FULL";
+                    urineWave.style.display = "block";
+                    document.getElementById('urineLevel').classList.add('glow-text');
+                    document.getElementById('urineAlertSound').play();
+                    addAlert("Urine bag is full! Immediate attention needed.", "danger");
+                    
+                    // Set alert on patient card
+                    document.getElementById('dynamicPatient').classList.add('alert');
+                    document.getElementById('dynamicStatus').textContent = "🚨 Urine Full";
+                    document.getElementById('dynamicStatus').className = "patient-status status-alert";
+                    triggerPatientAlert();
+                } else {
+                    urineStatus.textContent = "✅ Normal Urine Level";
+                    urineStatus.className = "status-indicator status-normal";
+                    urineCard.classList.remove('card-alert');
+                    urineLevel.textContent = "Empty";
+                    urineWave.style.display = "none";
+                    urineLevel.classList.remove('glow-text');
+                    
+                    // Clear alert if no other alerts are active
+                    if (!isAlertActive) {
+                        document.getElementById('dynamicPatient').classList.remove('alert');
+                        document.getElementById('dynamicStatus').textContent = "✅ Stable";
+                        document.getElementById('dynamicStatus').className = "patient-status status-normal";
+                    }
+                }
+            }
+        });
+
+        // Trigger patient alert
+        function triggerPatientAlert() {
+            if (!isAlertActive) {
+                isAlertActive = true;
+                document.getElementById('patientAlertSound').play();
+                
+                // Flash the patient card
+                const patientCard = document.getElementById('dynamicPatient');
+                patientCard.classList.add('alert');
+                
+                // Stop alert after 10 seconds if not cleared
+                setTimeout(() => {
+                    if (isAlertActive) {
+                        isAlertActive = false;
+                        patientCard.classList.remove('alert');
+                        document.getElementById('dynamicStatus').textContent = "✅ Stable";
+                        document.getElementById('dynamicStatus').className = "patient-status status-normal";
+                    }
+                }, 10000);
+            }
+        }
+
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        let isDarkMode = true;
+
+        themeToggle.addEventListener('click', () => {
+            isDarkMode = !isDarkMode;
+            
+            if (isDarkMode) {
+                document.documentElement.style.setProperty('--background-dark', '#050518');
+                document.documentElement.style.setProperty('--card-bg', 'rgba(10, 20, 40, 0.8)');
+                document.documentElement.style.setProperty('--text-color', '#eef1f7');
+                document.documentElement.style.setProperty('--ward-bg', 'rgba(5, 15, 30, 0.9)');
+                document.documentElement.style.setProperty('--patient-card-bg', 'rgba(20, 40, 80, 0.6)');
+                document.documentElement.style.setProperty('--patient-card-hover', 'rgba(30, 60, 120, 0.8)');
+                themeToggle.textContent = '🌙';
+            } else {
+                document.documentElement.style.setProperty('--background-dark', '#f0f4f8');
+                document.documentElement.style.setProperty('--card-bg', 'rgba(255, 255, 255, 0.8)');
+                document.documentElement.style.setProperty('--text-color', '#1a2130');
+                document.documentElement.style.setProperty('--ward-bg', 'rgba(200, 220, 240, 0.9)');
+                document.documentElement.style.setProperty('--patient-card-bg', 'rgba(220, 230, 250, 0.8)');
+                document.documentElement.style.setProperty('--patient-card-hover', 'rgba(200, 220, 240, 0.9)');
+                themeToggle.textContent = '☀️';
+            }
+            
+            // Update chart colors
+            Chart.defaults.color = isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+            Chart.defaults.borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            
+            // Update all charts
+            [chartBPM, chartIVDrip, chartTemp, chartAccel, chartOverview].forEach(chart => chart.update());
+        });
+
+        // Dashboard modal functionality
+        const dashboardModal = document.getElementById('dashboardModal');
+        const closeDashboard = document.getElementById('closeDashboard');
+        const dynamicPatient = document.getElementById('dynamicPatient');
+
+        dynamicPatient.addEventListener('click', () => {
+            dashboardModal.classList.add('active');
+        });
+
+        closeDashboard.addEventListener('click', () => {
+            dashboardModal.classList.remove('active');
+        });
+
+        // Initialize with some simulated alerts for demonstration
+        setTimeout(() => {
+            addAlert("System initialized successfully", "normal");
+            addAlert("Connected to all sensors", "normal");
+        }, 1000);
+    </script>
+</body>
+</html>
